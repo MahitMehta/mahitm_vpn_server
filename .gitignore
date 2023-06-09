@@ -1,1 +1,5 @@
 /target
+.vscode
+recipe.json
+
+wg0.*
