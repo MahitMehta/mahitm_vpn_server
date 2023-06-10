@@ -17,8 +17,7 @@ COPY . .
 RUN cargo build --release --target x86_64-unknown-linux-musl --bin mahitm_vpn_server
 
 FROM alpine AS runtime
-RUN addgroup -S myuser && adduser -S myuser -G myuser
-RUN apk add -U --no-cache wireguard-tools
+RUN apk add -U --no-cache wireguard-tools 
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/mahitm_vpn_server /usr/local/bin/
-USER myuser
+USER root
 CMD ["/usr/local/bin/mahitm_vpn_server"]

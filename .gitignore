@@ -1,5 +1,8 @@
 /target
 .vscode
 recipe.json
+.env
 
-wg0.*
+# Persisted Volumes
+/config
+/src/config/firebase_credentials.json
