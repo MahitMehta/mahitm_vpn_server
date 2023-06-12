@@ -4,5 +4,5 @@ recipe.json
 .env
 
 # Persisted Volumes
-/config
-/src/config/firebase_credentials.json
+/wireguard/*
+/src/firebase/credentials.json

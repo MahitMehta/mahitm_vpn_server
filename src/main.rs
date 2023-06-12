@@ -1,26 +1,13 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder };
-use std::{process::{Command, Stdio}}; 
+mod utils;
+
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, HttpRequest, Result };
+use std::{process::{Command, Stdio}, fs::File, collections::HashMap, sync::Mutex}; 
 use log::info; 
 use env_logger::Env;
 use dotenv; 
 use firestore::{ FirestoreDb, FirestoreDbOptions };
 use serde::{Deserialize, Serialize};
 use std::io::{Write};
-
-#[get("/")]
-async fn hello() -> impl Responder {
-    info!("Pinged Root: /");
-    HttpResponse::Ok().body("Hello world!")
-}
-
-#[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body(req_body)
-}
-
-async fn manual_hello() -> impl Responder {
-    HttpResponse::Ok().body("Hey there!")
-}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct TunnelStruct {
@@ -30,9 +17,123 @@ struct TunnelStruct {
     public_key: String
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct PeerStruct {
+    ipv4: String,
+    private_key: String,
+    public_key: String
+}
+
+struct PeerCache {
+    user_id: String,
+}
+
+struct AppState {
+    peers: Mutex<HashMap<String, PeerCache>>
+}
+
+#[get("/")]
+async fn root() -> impl Responder {
+    HttpResponse::Ok().body("All Systems Operations.")
+}
+
+#[get("/peer/add")]
+async fn add_peer(req : HttpRequest, db : web::Data<FirestoreDb>, app_state: web::Data<AppState>) -> Result<impl Responder> {
+    let authorization_token = std::str::from_utf8(req.headers().get("User-Agent").unwrap().as_bytes()); 
+    info!("{}", authorization_token.unwrap().to_string());
+    
+    let user_id = "O9Ry2tT9Iyco5v7dLGMGoTekLGg1"; 
+    let wg_tunnel_id = dotenv::var("WG_TUNNEL_ID").expect("Environment Variable \"WG_TUNNEL_ID\" Retrieved"); 
+
+    let mut peer_config: Result<Option<PeerStruct>, firestore::errors::FirestoreError> = db.fluent()
+        .select()
+        .by_id_in(format!("tunnels/{}/peers", wg_tunnel_id).as_str())
+        .obj()
+        .one(user_id)
+        .await;
+
+    let mut peer_ipv4: String = "".to_string();
+
+    if peer_config.as_ref().unwrap().is_none() { 
+        info!("Peer Config Not Found for UserID: {}", user_id);
+
+        // Generate Address; Handle Error if No Available Address
+        for n in 2..255 {
+            if !app_state.peers.lock().unwrap().contains_key(&format!("10.8.0.{}", n)) {
+                peer_ipv4 = format!("10.8.0.{}", n);
+                break; 
+            }
+        }
+
+        assert_ne!(peer_ipv4, ""); // No IP Address was available!
+
+        let wg_private_key = utils::generate_private_key(); 
+
+        let peer = PeerStruct {
+            public_key: utils::generate_public_key(&wg_private_key),
+            private_key: wg_private_key,
+            ipv4: peer_ipv4.clone()
+        };
+
+        peer_config = db.fluent()
+            .update()
+            .in_col(format!("tunnels/{}/peers", wg_tunnel_id).as_str())
+            .document_id(user_id)
+            .object(&peer)
+            .execute()
+            .await;
+    } else {
+        peer_ipv4 = (&peer_config.as_ref().ok().as_ref().unwrap().as_ref().unwrap().ipv4).to_string();
+    }
+
+    utils::add_peer_to_conf(
+        &peer_ipv4,
+        &peer_config.as_ref().ok().as_ref().unwrap().as_ref().unwrap().public_key
+    );
+    // TODO: Validate if peer was actually added
+    app_state.peers.lock().unwrap().insert(peer_ipv4.to_string(), PeerCache { user_id: user_id.to_string() });
+
+    // Handle Error
+    Ok(web::Json(peer_config.ok()))
+}
+
+// TODO: Pure Reliance on DB Currently, Attempt Removal of Peer based on Client Data and Peer Cache 
+#[get("/peer/remove")]
+async fn remove_peer(app_state : web::Data<AppState>, db : web::Data<FirestoreDb>) -> impl Responder {
+    let user_id = "O9Ry2tT9Iyco5v7dLGMGoTekLGg1"; 
+    let wg_tunnel_id = dotenv::var("WG_TUNNEL_ID").expect("Environment Variable \"WG_TUNNEL_ID\" Retrieved"); 
+
+    let peer_config: Result<Option<PeerStruct>, firestore::errors::FirestoreError> = db.fluent()
+        .select()
+        .by_id_in(format!("tunnels/{}/peers", wg_tunnel_id).as_str())
+        .obj()
+        .one(user_id)
+        .await;
+
+    if peer_config.as_ref().unwrap().as_ref().is_none() {
+        HttpResponse::BadRequest().body("Peer Not Connected.");
+    }
+
+    let peer_ipv4 = &peer_config.as_ref().ok().as_ref().unwrap().as_ref().unwrap().ipv4;
+    
+    utils::remove_peer_from_conf(peer_ipv4, &peer_config.as_ref().ok().as_ref().unwrap().as_ref().unwrap().public_key);
+    app_state.peers.lock().unwrap().remove(peer_ipv4);
+
+    let _ = db.fluent()
+        .delete()
+        .from(format!("tunnels/{}/peers", wg_tunnel_id).as_str())
+        .document_id(user_id)
+        .execute()
+        .await;
+
+    HttpResponse::Ok().body("Removed Peer.")
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+   
+    utils::generate_firebase_credentials_file();
    
     let firebase_project_id = dotenv::var("FIREBASE_PROJECT_ID");    
     assert!(firebase_project_id.is_ok(), "Environment Variable \"FIREBASE_PROJECT_ID\" Could not be found!");
@@ -49,13 +150,13 @@ async fn main() -> std::io::Result<()> {
     let db = FirestoreDb::with_options_token_source(
         FirestoreDbOptions::new(firebase_project_id.as_ref().unwrap().to_string()),
         gcloud_sdk::GCP_DEFAULT_SCOPES.clone(),
-        gcloud_sdk::TokenSourceType::File("src/config/firebase_credentials.json".into())
-    ).await;
+        gcloud_sdk::TokenSourceType::File("src/firebase/credentials.json".into())
+    ).await.expect("Failed to Connect to Firestore");
 
     let wg_private_key : String;
     let wg_public_key : String; 
 
-    let tunnel_config: Result<Option<TunnelStruct>, firestore::errors::FirestoreError> = db.as_ref().unwrap().fluent()
+    let tunnel_config: Result<Option<TunnelStruct>, firestore::errors::FirestoreError> = db.fluent()
         .select()
         .by_id_in("tunnels")
         .obj()
@@ -65,26 +166,8 @@ async fn main() -> std::io::Result<()> {
     if tunnel_config.as_ref().unwrap().is_none() {
         info!("Tunnel Doesn't Exist!");
 
-        let private_key = Command::new("wg")
-            .arg("genkey")
-            .stdout(Stdio::piped())
-            .output()
-            .expect("Failed to Generate New Private Key");
-
-        wg_private_key = String::from_utf8(private_key.stdout).unwrap();
-
-        let mut public_key = Command::new("wg")
-            .arg("pubkey")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .expect("Failed to Generate New Public Key");
-
-        let stdin = public_key.stdin.as_mut().expect("Failed to open stdin");
-        stdin.write_all(wg_private_key.as_bytes()).expect("Failed to write to stdin");
-
-        let public_key_output = public_key.wait_with_output().expect("Failed to read stdout");
-        wg_public_key = String::from_utf8(public_key_output.stdout).unwrap();
+        wg_private_key = utils::generate_private_key(); 
+        wg_public_key = utils::generate_public_key(&wg_private_key);
     }
     else {
         wg_private_key = tunnel_config.as_ref().unwrap().as_ref().unwrap().clone().private_key;
@@ -93,19 +176,47 @@ async fn main() -> std::io::Result<()> {
 
     let tunnel_struct = TunnelStruct {
         ipv4: wg_host.unwrap().to_string(),
-        port: wg_port.unwrap().to_string().parse::<u32>().unwrap(),
-        private_key: wg_private_key,
+        port: wg_port.as_ref().unwrap().to_string().parse::<u32>().unwrap(),
+        private_key: wg_private_key.clone(),
         public_key: wg_public_key
     };
     
     // Create or Update Tunnel Properties
-    let _object_returned: Result<TunnelStruct, firestore::errors::FirestoreError> = db.unwrap().fluent()
-        .insert()
-        .into("tunnels")
+    let updated_tunnel: Result<TunnelStruct, firestore::errors::FirestoreError> = db.fluent()
+        .update()
+        .in_col("tunnels")
         .document_id(wg_tunnel_id.unwrap().to_string())
         .object(&tunnel_struct)
         .execute()
         .await;
+
+    let wg_conf = format!(r#"
+# Note: Do not edit this file directly.
+# Your changes will be overwritten!
+
+# Server
+[Interface]
+PrivateKey = {}
+Address = {}/24
+ListenPort = {}
+PreUp = 
+PostUp = {}
+PreDown = 
+PostDown =
+"#, 
+updated_tunnel.as_ref().unwrap().private_key, 
+"10.8.0.1",
+updated_tunnel.as_ref().unwrap().port, 
+"iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE; iptables -A INPUT -p udp -m udp --dport 51820 -j ACCEPT; iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT;"
+    );
+
+    let wg_conf_path = dotenv::var("WG_CONF_PATH");    
+    assert!(wg_conf_path.is_ok(), "Environment Variable \"WG_CONF_PATH\" Could not be found!");
+
+    let path = format!("{}/wg0.conf", wg_conf_path.unwrap().to_string());
+    let mut output = File::create(path)?;
+    
+    write!(output, "{}", wg_conf).expect("Updated wg0.conf");
 
     Command::new("wg-quick")
         .args(["down", "wg0"])
@@ -122,11 +233,17 @@ async fn main() -> std::io::Result<()> {
     info!("STDERR:");
     info!("{}", stderr);
 
-    HttpServer::new(|| {
+    let app_state = web::Data::new(AppState {
+        peers: Mutex::new(HashMap::new()) // TODO: Populate with clients from Firestore
+    });
+
+    HttpServer::new(move || {
         App::new()
-            .service(hello)
-            .service(echo)
-            .route("/hey", web::get().to(manual_hello))
+            .app_data(app_state.clone())
+            .app_data(web::Data::new(db.clone()))
+            .service(root)
+            .service(add_peer)
+            .service(remove_peer)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

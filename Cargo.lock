@@ -1144,6 +1144,7 @@ dependencies = [
  "gcloud-sdk",
  "log",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

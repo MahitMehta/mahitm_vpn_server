@@ -5,14 +5,18 @@ services:
       - WG_HOST=$WG_HOST
       - WG_PORT=$WG_PORT
       - WG_TUNNEL_ID=$WG_TUNNEL_ID
+      - WG_CONF_PATH=/etc/wireguard
       - FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID
+      - FIREBASE_CLIENT_ID=$FIREBASE_CLIENT_ID
+      - FIREBASE_CLIENT_SECRET=$FIREBASE_CLIENT_SECRET
+      - FIREBASE_REFRESH_TOKEN=$FIREBASE_REFRESH_TOKEN
     build: 
       context: .
       dockerfile: Dockerfile
     container_name: mahitm-vpn
     volumes:
-      - ./config:/etc/wireguard
-      - ./src/config:/src/config
+      - ./wireguard:/etc/wireguard
+      - ./src/firebase:/src/firebase
     ports:
       - "51820:51820/udp"
       - "8080:8080/tcp"
