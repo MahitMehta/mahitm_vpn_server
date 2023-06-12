@@ -1,6 +1,8 @@
 mod utils;
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, HttpRequest, Result };
+use actix_web::{get, post, web::{self}, Error, App, HttpResponse, HttpServer, Responder, HttpRequest, Result, dev::{ServiceRequest, ServiceResponse}, body::MessageBody, FromRequest, HttpMessage };
+use actix_web_lab::middleware::{Next, from_fn};
+use futures::future::{ok, err};
 use std::{process::{Command, Stdio}, fs::File, collections::HashMap, sync::Mutex}; 
 use log::info; 
 use env_logger::Env;
@@ -8,6 +10,7 @@ use dotenv;
 use firestore::{ FirestoreDb, FirestoreDbOptions };
 use serde::{Deserialize, Serialize};
 use std::io::{Write};
+use firebase_token::JwkAuth;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct TunnelStruct {
@@ -37,25 +40,20 @@ async fn root() -> impl Responder {
     HttpResponse::Ok().body("All Systems Operations.")
 }
 
-#[get("/peer/add")]
-async fn add_peer(req : HttpRequest, db : web::Data<FirestoreDb>, app_state: web::Data<AppState>) -> Result<impl Responder> {
-    let authorization_token = std::str::from_utf8(req.headers().get("User-Agent").unwrap().as_bytes()); 
-    info!("{}", authorization_token.unwrap().to_string());
-    
-    let user_id = "O9Ry2tT9Iyco5v7dLGMGoTekLGg1"; 
+async fn add_peer(_req : HttpRequest, db : web::Data<FirestoreDb>, app_state: web::Data<AppState>, user : User) -> Result<impl Responder> {
     let wg_tunnel_id = dotenv::var("WG_TUNNEL_ID").expect("Environment Variable \"WG_TUNNEL_ID\" Retrieved"); 
 
     let mut peer_config: Result<Option<PeerStruct>, firestore::errors::FirestoreError> = db.fluent()
         .select()
         .by_id_in(format!("tunnels/{}/peers", wg_tunnel_id).as_str())
         .obj()
-        .one(user_id)
+        .one(user.clone().user_id)
         .await;
 
     let mut peer_ipv4: String = "".to_string();
 
     if peer_config.as_ref().unwrap().is_none() { 
-        info!("Peer Config Not Found for UserID: {}", user_id);
+        info!("Peer Config Not Found for UserID: {}", user.user_id);
 
         // Generate Address; Handle Error if No Available Address
         for n in 2..255 {
@@ -78,7 +76,7 @@ async fn add_peer(req : HttpRequest, db : web::Data<FirestoreDb>, app_state: web
         peer_config = db.fluent()
             .update()
             .in_col(format!("tunnels/{}/peers", wg_tunnel_id).as_str())
-            .document_id(user_id)
+            .document_id(user.clone().user_id)
             .object(&peer)
             .execute()
             .await;
@@ -91,14 +89,14 @@ async fn add_peer(req : HttpRequest, db : web::Data<FirestoreDb>, app_state: web
         &peer_config.as_ref().ok().as_ref().unwrap().as_ref().unwrap().public_key
     );
     // TODO: Validate if peer was actually added
-    app_state.peers.lock().unwrap().insert(peer_ipv4.to_string(), PeerCache { user_id: user_id.to_string() });
+    app_state.peers.lock().unwrap().insert(peer_ipv4.to_string(), PeerCache { user_id: user.clone().user_id });
 
     // Handle Error
-    Ok(web::Json(peer_config.ok()))
+    Ok(web::Json(peer_config.ok())) 
 }
 
 // TODO: Pure Reliance on DB Currently, Attempt Removal of Peer based on Client Data and Peer Cache 
-#[get("/peer/remove")]
+#[post("/peer/remove")]
 async fn remove_peer(app_state : web::Data<AppState>, db : web::Data<FirestoreDb>) -> impl Responder {
     let user_id = "O9Ry2tT9Iyco5v7dLGMGoTekLGg1"; 
     let wg_tunnel_id = dotenv::var("WG_TUNNEL_ID").expect("Environment Variable \"WG_TUNNEL_ID\" Retrieved"); 
@@ -127,6 +125,49 @@ async fn remove_peer(app_state : web::Data<AppState>, db : web::Data<FirestoreDb
         .await;
 
     HttpResponse::Ok().body("Removed Peer.")
+}
+
+
+#[derive(Clone)]
+struct User {
+    user_id : String
+}
+
+impl FromRequest for User {
+    type Error = actix_web::Error;
+    type Future = futures::future::Ready<Result<Self, Self::Error>>;
+
+    fn from_request(req: &HttpRequest, _payload: &mut actix_web::dev::Payload) -> Self::Future {
+        match req.extensions().get::<User>() {
+            Some(user) => return ok(user.clone()),
+            None => return err(actix_web::error::ErrorBadRequest("Error Called From User FromRequest"))
+        };
+    }
+
+}
+
+async fn auth_middleware(
+    req: ServiceRequest,
+    next: Next<impl MessageBody>,
+) -> Result<ServiceResponse<impl MessageBody>, Error> {
+    
+    if req.path().starts_with("/peer") {
+        let auth_header = std::str::from_utf8(req.headers().get("Authorization").unwrap().as_bytes()).unwrap().to_string(); 
+        let auth_token = auth_header.split("Bearer").collect::<Vec<&str>>()[1].trim();
+    
+        let firebase_project_id = dotenv::var("FIREBASE_PROJECT_ID").expect("Retrieved FIREBASE_PROJECT_ID ENV Variable");   
+    
+        let jwk_auth = JwkAuth::new(firebase_project_id).await;
+        let token_claim = jwk_auth.verify(auth_token).await;
+    
+        let user_id = token_claim.unwrap().claims.sub;
+
+        req.extensions_mut().insert(User {
+            user_id
+        });
+    }
+
+    next.call(req).await
 }
 
 #[actix_web::main]
@@ -242,8 +283,20 @@ updated_tunnel.as_ref().unwrap().port,
             .app_data(app_state.clone())
             .app_data(web::Data::new(db.clone()))
             .service(root)
-            .service(add_peer)
             .service(remove_peer)
+            // .wrap_fn(|req, srv| {
+            //     let auth_header = std::str::from_utf8(req.headers().get("Authorization").unwrap().as_bytes()).unwrap().to_string(); 
+            //     let auth_token = auth_header.split("Bearer").collect::<Vec<&str>>()[1].trim_start();
+     
+
+            //     let fut = srv.call(req);
+            //     async {
+            //         let res = fut.await?;
+            //         Ok(res)
+            //     }
+            // })
+            .wrap(from_fn(auth_middleware))
+            .route("/peer/add", web::post().to(add_peer))
     })
     .bind(("0.0.0.0", 8080))?
     .run()
