@@ -9,10 +9,9 @@ commands:
             cat /etc/os-release
       - run: 
           command: |
-            sudo apt update
-            sudo apt install snapd
-            sudo snap install doctl
-            sudo snap connect doctl:dot-docker
+            apk update
+            apk upgrade --available
+            apk --no-cache add doctl
       - run: 
           command: |
             doctl version     
@@ -27,7 +26,7 @@ commands:
     steps:
       - run:
           command: |
-            sudo doctl auth init -t $<<parameters.digitalocean-access-token>>
+            doctl auth init -t $<<parameters.digitalocean-access-token>>
           name: Initialize doctl
 
 jobs:           
@@ -39,7 +38,7 @@ jobs:
           Name of environment variable storing the digitalocean v2 api access token
         type: env_var_name
     docker: 
-      - image: cimg/rust:1.70.0
+      - image: alpine:3.15
         environment: 
           WG_HOST=$WG_HOST
           WG_PORT=$WG_PORT
