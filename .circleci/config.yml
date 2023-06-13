@@ -2,8 +2,14 @@ orbs:
   doctl: digitalocean/cli@0.1.1
 version: 2.1
 
-jobs: 
+jobs:           
   build: 
+    parameters:
+      digitalocean-access-token:
+        default: DIGITALOCEAN_ACCESS_TOKEN
+        description: |
+          Name of environment variable storing the digitalocean v2 api access token
+        type: env_var_name
     docker: 
       - image: docker:20.10.18-git
         environment: 
@@ -15,8 +21,8 @@ jobs:
           FIREBASE_CLIENT_SECRET=$FIREBASE_CLIENT_SECRET
           FIREBASE_REFRESH_TOKEN=$FIREBASE_REFRESH_TOKEN
     steps: 
-      - doctl/install_and_initialize_cli:
-          context: mahitmvpn
+      - doctl/install
+      - doctl/initialize
       - checkout
       - setup_remote_docker:
           docker_layer_caching: true
