@@ -37,7 +37,11 @@ jobs:
       - run:
             name: Connect to Droplet via SSH
             command: |
-              ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST ls
+              ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST 
+      - run:
+            name: Testing Droplet via SSH
+            command: |
+              sudo -i && ls
   build: 
     parameters:
       digitalocean-access-token:
