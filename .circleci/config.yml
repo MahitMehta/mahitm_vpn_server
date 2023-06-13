@@ -56,7 +56,7 @@ jobs:
       - run: 
           name: Docker Compose Build
           command: |
-            docker compose -f docker-compose.yml -f production.yml build
+            docker compose -f docker-compose.yml -f production.yml build 
       - run: 
           name: Login to DigitalOcean Registry
           command: |
@@ -64,7 +64,7 @@ jobs:
       - run: 
           name: Push to DigitalOcean Registry
           command: |  
-            docker compose push
+            docker compose -f docker-compose.yml -f production.yml push 
 
 workflows:
   build_and_upload: 
