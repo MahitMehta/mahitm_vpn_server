@@ -27,7 +27,7 @@ commands:
     steps:
       - run:
           command: |
-            doctl auth init -t $<<parameters.digitalocean-access-token>>
+            sudo doctl auth init -t $<<parameters.digitalocean-access-token>>
           name: Initialize doctl
 
 jobs:           
