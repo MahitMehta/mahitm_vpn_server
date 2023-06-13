@@ -1,22 +1,33 @@
-orbs:
-  doctl: digitalocean/cli@0.1.1
 version: 2.1
 
 commands: 
   doctl_install:
-      description: Install the doctl, if not available
-      steps:
-        - run: 
-            command: |
-              cat /etc/os-release
-        - run: 
-            command: |
-              apk update
-              apk upgrade --available
-              apk --no-cache add doctl
-        - run: 
-            command: |
-              doctl version     
+    description: Install the doctl, if not available
+    steps:
+      - run: 
+          command: |
+            cat /etc/os-release
+      - run: 
+          command: |
+            apk update
+            apk upgrade --available
+            apk --no-cache add doctl
+      - run: 
+          command: |
+            doctl version     
+   doctl_initialize:
+    description: Initilize the digitalocean CLI
+    parameters:
+      digitalocean-access-token:
+        default: DIGITALOCEAN_ACCESS_TOKEN
+        description: |
+          Name of environment variable storing the digitalocean v2 api access token
+        type: env_var_name
+    steps:
+      - run:
+          command: |
+            doctl auth init -t $<<parameters.digitalocean-access-token>>
+          name: Initialize doctl
 
 jobs:           
   build: 
@@ -38,7 +49,7 @@ jobs:
           FIREBASE_REFRESH_TOKEN=$FIREBASE_REFRESH_TOKEN
     steps: 
       - doctl_install
-      - doctl/initialize
+      - doctl_initialize
       - checkout
       - setup_remote_docker:
           docker_layer_caching: true
