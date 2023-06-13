@@ -62,6 +62,10 @@ jobs:
           command: |
             doctl registry login
       - run: 
+          name: Temp Logging
+          command: |
+            docker image ls
+      - run: 
           name: Push to DigitalOcean Registry
           command: |  
             docker image tag mahitm_vpn_server-mahitm-vpn:latest "registry.digitalocean.com/mahitm/vpn"
