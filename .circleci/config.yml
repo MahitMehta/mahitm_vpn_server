@@ -2,6 +2,22 @@ orbs:
   doctl: digitalocean/cli@0.1.1
 version: 2.1
 
+commands: 
+  doctl_install:
+      description: Install the doctl, if not available
+      steps:
+        - run: 
+            command: |
+              cat /etc/os-release
+        - run: 
+            command: |
+              apk update
+              apk upgrade --available
+              apk --no-cache add doctl
+        - run: 
+            command: |
+              doctl version     
+
 jobs:           
   build: 
     parameters:
@@ -21,7 +37,7 @@ jobs:
           FIREBASE_CLIENT_SECRET=$FIREBASE_CLIENT_SECRET
           FIREBASE_REFRESH_TOKEN=$FIREBASE_REFRESH_TOKEN
     steps: 
-      - doctl/install
+      - doctl_install
       - doctl/initialize
       - checkout
       - setup_remote_docker:
