@@ -123,7 +123,7 @@ async fn remove_peer(app_state : web::Data<AppState>, db : web::Data<FirestoreDb
         .execute()
         .await;
 
-    HttpResponse::Ok().body("Removed Peer.")
+    HttpResponse::Ok().body("Removed Peer Successfully.")
 }
 
 

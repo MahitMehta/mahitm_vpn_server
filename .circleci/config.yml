@@ -38,7 +38,7 @@ jobs:
           Name of environment variable storing the digitalocean v2 api access token
         type: env_var_name
     docker: 
-      - image: docker:24.0.2-cli
+      - image: docker:24.0.2-git
         environment: 
           WG_HOST=$WG_HOST
           WG_PORT=$WG_PORT
@@ -56,7 +56,7 @@ jobs:
       - run: 
           name: Docker Compose Build
           command: |
-            docker compose build
+            docker compose -f docker-compose.yml -f production.yml build
       - run: 
           name: Login to DigitalOcean Registry
           command: |
@@ -64,10 +64,26 @@ jobs:
       - run: 
           name: Push to DigitalOcean Registry
           command: |  
-            docker image tag project-mahitm-vpn:latest "registry.digitalocean.com/mahitm/vpn"
-            docker push "registry.digitalocean.com/mahitm/vpn"
+            docker compose push
+  run_vpn: 
+    parameters:
+      droplet_ssh_password:
+        default: DROPLET_SSH_PASSWORD
+        description: |
+          Name of environment variable storing root user's password
+        type: env_var_name
+    docker: 
+      - image: cimg/base:2023.06
+    steps: 
+      - run: 
+          name: SSH into Droplet
+          command: | 
+            ssh root@
+
 workflows:
   build_and_upload: 
     jobs: 
       - build: 
+          context: mahitmvpn
+      - run_vpn: 
           context: mahitmvpn

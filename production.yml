@@ -1,0 +1,3 @@
+services:
+  mahitm-vpn:
+    image: registry.digitalocean.com/mahitm/vpn
