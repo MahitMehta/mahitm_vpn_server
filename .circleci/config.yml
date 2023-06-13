@@ -21,6 +21,15 @@ jobs:
           name: Docker Compose Build
           command: |
             docker compose build
+      - run: 
+          name: Login to DigitalOcean Registry
+          command: |
+            doctl registry login
+      - run: 
+          name: Push to DigitalOcean Registry
+          command: |  
+            docker image tag mahitm_vpn_server-mahitm-vpn:latest "registry.digitalocean.com/mahitm/vpn"
+            docker push "registry.digitalocean.com/mahitm/vpn"
 workflows:
   install_and_configure_cli:
     jobs:
