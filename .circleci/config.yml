@@ -15,8 +15,11 @@ jobs:
           FIREBASE_CLIENT_SECRET=$FIREBASE_CLIENT_SECRET
           FIREBASE_REFRESH_TOKEN=$FIREBASE_REFRESH_TOKEN
     steps: 
+      - doctl/install_and_initialize_cli:
+          context: mahitmvpn
       - checkout
       - setup_remote_docker
+          docker_layer_caching: true
       - run: 
           name: Docker Compose Build
           command: |
@@ -31,11 +34,6 @@ jobs:
             docker image tag mahitm_vpn_server-mahitm-vpn:latest "registry.digitalocean.com/mahitm/vpn"
             docker push "registry.digitalocean.com/mahitm/vpn"
 workflows:
-  install_and_configure_cli:
-    jobs:
-      - doctl/install_and_initialize_cli:
-          context: mahitmvpn
-          executor: doctl/default
   build_and_upload: 
     jobs: 
       - build
