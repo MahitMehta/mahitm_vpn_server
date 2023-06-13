@@ -38,7 +38,7 @@ jobs:
           Name of environment variable storing the digitalocean v2 api access token
         type: env_var_name
     docker: 
-      - image: alpinelinux/docker-cli:latest
+      - image: docker:24.0.2-cli
         environment: 
           WG_HOST=$WG_HOST
           WG_PORT=$WG_PORT
