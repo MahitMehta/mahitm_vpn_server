@@ -1,9 +1,32 @@
 orbs:
   doctl: digitalocean/cli@0.1.1
 version: 2.1
+
+jobs: 
+  build: 
+    docker: 
+      - image: docker:20.10.18-git
+        environment: 
+          WG_HOST=$WG_HOST
+          WG_PORT=$WG_PORT
+          WG_TUNNEL_ID=$WG_TUNNEL_ID
+          FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID
+          FIREBASE_CLIENT_ID=$FIREBASE_CLIENT_ID
+          FIREBASE_CLIENT_SECRET=$FIREBASE_CLIENT_SECRET
+          FIREBASE_REFRESH_TOKEN=$FIREBASE_REFRESH_TOKEN
+    steps: 
+      - checkout
+      - setup_remote_docker
+      - run: 
+          name: Docker Compose Build
+          command: |
+            docker compose build
 workflows:
   install_and_configure_cli:
     jobs:
       - doctl/install_and_initialize_cli:
           context: mahitmvpn
           executor: doctl/default
+  build_and_upload: 
+    jobs: 
+      - build
