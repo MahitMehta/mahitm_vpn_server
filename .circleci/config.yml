@@ -65,25 +65,9 @@ jobs:
           name: Push to DigitalOcean Registry
           command: |  
             docker compose push
-  run_vpn: 
-    parameters:
-      droplet_ssh_password:
-        default: DROPLET_SSH_PASSWORD
-        description: |
-          Name of environment variable storing root user's password
-        type: env_var_name
-    docker: 
-      - image: cimg/base:2023.06
-    steps: 
-      - run: 
-          name: SSH into Droplet
-          command: | 
-            ssh root@
 
 workflows:
   build_and_upload: 
     jobs: 
       - build: 
-          context: mahitmvpn
-      - run_vpn: 
           context: mahitmvpn
