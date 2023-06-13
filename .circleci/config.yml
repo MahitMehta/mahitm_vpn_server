@@ -9,10 +9,10 @@ commands:
             cat /etc/os-release
       - run: 
           command: |
-            apt update
-            apt upgrade 
-            snap install doctl
-            snap connect doctl:dot-docker
+            sudo apt update
+            sudo apt upgrade 
+            sudo snap install doctl
+            sudo snap connect doctl:dot-docker
       - run: 
           command: |
             doctl version     
