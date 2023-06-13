@@ -37,7 +37,7 @@ jobs:
       - run:
             name: Connect to Droplet via SSH
             command: |
-              ssh $SSH_USER@$WG_HOST ls
+              ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST ls
   build: 
     parameters:
       digitalocean-access-token:
@@ -78,6 +78,4 @@ workflows:
   build_and_upload: 
     jobs: 
       - setup_droplet: 
-          context: mahitmvpn
-      - build: 
           context: mahitmvpn
