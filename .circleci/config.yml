@@ -9,9 +9,10 @@ commands:
             cat /etc/os-release
       - run: 
           command: |
-            apk update
-            apk upgrade --available
-            apk --no-cache add doctl
+            apt update
+            apt upgrade 
+            snap install doctl
+            snap connect doctl:dot-docker
       - run: 
           command: |
             doctl version     
