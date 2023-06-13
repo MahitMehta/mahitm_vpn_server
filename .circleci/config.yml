@@ -15,7 +15,7 @@ commands:
       - run: 
           command: |
             doctl version     
-   doctl_initialize:
+  doctl_initialize:
     description: Initilize the digitalocean CLI
     parameters:
       digitalocean-access-token:
