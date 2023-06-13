@@ -10,7 +10,7 @@ commands:
       - run: 
           command: |
             sudo apt update
-            sudo apt upgrade 
+            sudo apt install snapd
             sudo snap install doctl
             sudo snap connect doctl:dot-docker
       - run: 
