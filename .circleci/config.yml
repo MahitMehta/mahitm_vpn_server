@@ -37,7 +37,7 @@ jobs:
       - run:
             name: Connect to Droplet via SSH
             command: |
-            ssh $SSH_USER@$WG_HOST ls
+              ssh $SSH_USER@$WG_HOST ls
   build: 
     parameters:
       digitalocean-access-token:
