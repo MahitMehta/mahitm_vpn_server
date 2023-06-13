@@ -21,7 +21,7 @@ struct TunnelStruct {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct PeerStruct {
+struct PeerDocumentStruct {
     ipv4: String,
     private_key: String,
     public_key: String
@@ -32,7 +32,7 @@ struct PeerCache {
 }
 
 struct AppState {
-    peers: Mutex<HashMap<String, PeerCache>>
+    peers: Mutex<HashMap<String, PeerCache>>,
 }
 
 #[get("/")]
@@ -43,7 +43,7 @@ async fn root() -> impl Responder {
 async fn add_peer(_req : HttpRequest, db : web::Data<FirestoreDb>, app_state: web::Data<AppState>, user : User) -> Result<impl Responder> {
     let wg_tunnel_id = dotenv::var("WG_TUNNEL_ID").expect("Environment Variable \"WG_TUNNEL_ID\" Retrieved"); 
 
-    let mut peer_config: Result<Option<PeerStruct>, firestore::errors::FirestoreError> = db.fluent()
+    let mut peer_config: Result<Option<PeerDocumentStruct>, firestore::errors::FirestoreError> = db.fluent()
         .select()
         .by_id_in(format!("tunnels/{}/peers", wg_tunnel_id).as_str())
         .obj()
@@ -67,7 +67,7 @@ async fn add_peer(_req : HttpRequest, db : web::Data<FirestoreDb>, app_state: we
 
         let wg_private_key = utils::generate_private_key(); 
 
-        let peer = PeerStruct {
+        let peer = PeerDocumentStruct {
             public_key: utils::generate_public_key(&wg_private_key),
             private_key: wg_private_key,
             ipv4: peer_ipv4.clone()
@@ -97,15 +97,14 @@ async fn add_peer(_req : HttpRequest, db : web::Data<FirestoreDb>, app_state: we
 
 // TODO: Pure Reliance on DB Currently, Attempt Removal of Peer based on Client Data and Peer Cache 
 #[post("/peer/remove")]
-async fn remove_peer(app_state : web::Data<AppState>, db : web::Data<FirestoreDb>) -> impl Responder {
-    let user_id = "O9Ry2tT9Iyco5v7dLGMGoTekLGg1"; 
+async fn remove_peer(app_state : web::Data<AppState>, db : web::Data<FirestoreDb>, user : User) -> impl Responder {
     let wg_tunnel_id = dotenv::var("WG_TUNNEL_ID").expect("Environment Variable \"WG_TUNNEL_ID\" Retrieved"); 
 
-    let peer_config: Result<Option<PeerStruct>, firestore::errors::FirestoreError> = db.fluent()
+    let peer_config: Result<Option<PeerDocumentStruct>, firestore::errors::FirestoreError> = db.fluent()
         .select()
         .by_id_in(format!("tunnels/{}/peers", wg_tunnel_id).as_str())
         .obj()
-        .one(user_id)
+        .one(&user.user_id)
         .await;
 
     if peer_config.as_ref().unwrap().as_ref().is_none() {
@@ -120,7 +119,7 @@ async fn remove_peer(app_state : web::Data<AppState>, db : web::Data<FirestoreDb
     let _ = db.fluent()
         .delete()
         .from(format!("tunnels/{}/peers", wg_tunnel_id).as_str())
-        .document_id(user_id)
+        .document_id(user.user_id)
         .execute()
         .await;
 
@@ -143,7 +142,6 @@ impl FromRequest for User {
             None => return err(actix_web::error::ErrorBadRequest("Error Called From User FromRequest"))
         };
     }
-
 }
 
 async fn auth_middleware(
@@ -275,7 +273,7 @@ updated_tunnel.as_ref().unwrap().port,
     info!("{}", stderr);
 
     let app_state = web::Data::new(AppState {
-        peers: Mutex::new(HashMap::new()) // TODO: Populate with clients from Firestore
+        peers: Mutex::new(HashMap::new()), // TODO: Populate with clients from Firestore
     });
 
     HttpServer::new(move || {
