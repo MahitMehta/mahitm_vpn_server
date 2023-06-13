@@ -38,7 +38,7 @@ jobs:
           Name of environment variable storing the digitalocean v2 api access token
         type: env_var_name
     docker: 
-      - image: cimg/rust
+      - image: cimg/rust:1.70.0
         environment: 
           WG_HOST=$WG_HOST
           WG_PORT=$WG_PORT
