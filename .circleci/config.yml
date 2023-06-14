@@ -30,18 +30,6 @@ commands:
           name: Initialize doctl
 
 jobs:    
-  setup_droplet: 
-    docker: 
-      - image: cimg/base:2023.06
-    steps: 
-      - run:
-            name: Connect to Droplet via SSH
-            command: |
-              ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST 
-      - run:
-            name: Testing Droplet via SSH
-            command: |
-              sudo -i && ls
   build: 
     parameters:
       digitalocean-access-token:
@@ -77,9 +65,16 @@ jobs:
           name: Push to DigitalOcean Registry
           command: |  
             docker compose -f docker-compose.yml -f production.yml push 
-
+  run_vpn: 
+    docker: 
+      - image: cimg/base:2023.06
+    steps: 
+      - run:
+            name: Connect to Droplet via SSH
+            command: |
+              ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST ./scripts/update.sh
 workflows:
   build_and_upload: 
     jobs: 
-      - setup_droplet: 
+      - run_vpn: 
           context: mahitmvpn
