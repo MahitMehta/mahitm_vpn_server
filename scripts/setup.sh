@@ -1,5 +1,13 @@
 #!/bin/bash
 
-sudo -i
+sudo su - <<EOF
 
-pwd
+pwd 
+
+cd mahitm_vpn_server
+
+git pull origin master
+
+docker compose -f docker-compose.yml -f production.yml up
+
+EOF
