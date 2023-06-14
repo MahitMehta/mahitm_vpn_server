@@ -37,7 +37,7 @@ struct AppState {
 
 #[get("/")]
 async fn root() -> impl Responder {
-    HttpResponse::Ok().body("All Systems Operations.")
+    HttpResponse::Ok().body("All Systems Operational.")
 }
 
 async fn add_peer(_req : HttpRequest, db : web::Data<FirestoreDb>, app_state: web::Data<AppState>, user : User) -> Result<impl Responder> {

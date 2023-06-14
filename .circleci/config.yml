@@ -30,6 +30,15 @@ commands:
           name: Initialize doctl
 
 jobs:    
+  setup_droplet: 
+    docker: 
+      - image: cimg/base:2023.06
+    steps: 
+      - checkout
+      - run:
+            name: Connect to Droplet via SSH and Execute Setup Script
+            command: |
+              ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST 'sh' < ./scripts/setup.sh
   build: 
     parameters:
       digitalocean-access-token:
@@ -68,5 +77,7 @@ jobs:
 workflows:
   build_and_upload: 
     jobs: 
+      - setup_droplet: 
+          context: mahitmvpn
       - build: 
           context: mahitmvpn
