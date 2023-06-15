@@ -2,7 +2,7 @@ mod utils;
 
 use actix_web::{get, post, web::{self}, Error, App, HttpResponse, HttpServer, Responder, HttpRequest, Result, dev::{ServiceRequest, ServiceResponse}, body::MessageBody, FromRequest, HttpMessage };
 use actix_web_lab::middleware::{Next, from_fn};
-use futures::{future::{ok, err}, stream::BoxStream, Stream};
+use futures::{future::{ok, err}};
 use std::{process::{Command, Stdio}, fs::File, collections::HashMap, sync::Mutex}; 
 use log::info; 
 use env_logger::Env;
@@ -267,6 +267,21 @@ updated_tunnel.as_ref().unwrap().port,
         .get_page()
         .await;
 
+    Command::new("wg-quick")
+        .args(["down", "wg0"])
+        .output()
+        .expect("failed to execute process");
+
+    let output = Command::new("wg-quick")
+        .args(["up", "wg0"])
+        .stdout(Stdio::piped())
+        .output()
+        .expect("failed to execute process");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    info!("STDERR:");
+    info!("{}", stderr);
+
     for previously_connected_peer in docs.unwrap().documents.iter(){
         // TODO: Figure out better way to extract string
         let peer_ipv4_raw = format!("{:?}", previously_connected_peer.fields.get("ipv4").unwrap().value_type.as_ref().unwrap());
@@ -284,21 +299,6 @@ updated_tunnel.as_ref().unwrap().port,
             user_id: previously_connected_peer.name.to_string()
         });
     }
-
-    Command::new("wg-quick")
-        .args(["down", "wg0"])
-        .output()
-        .expect("failed to execute process");
-
-    let output = Command::new("wg-quick")
-        .args(["up", "wg0"])
-        .stdout(Stdio::piped())
-        .output()
-        .expect("failed to execute process");
-
-    let stderr = String::from_utf8(output.stderr).unwrap();
-    info!("STDERR:");
-    info!("{}", stderr);
 
     HttpServer::new(move || {
         App::new()
