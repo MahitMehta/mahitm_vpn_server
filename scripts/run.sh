@@ -8,6 +8,6 @@ cd mahitm_vpn_server
 
 docker compose -f docker-compose.yml -f production.yml pull
 
-docker compose -f docker-compose.yml -f production.yml up --detach --remove-orphans --build
+docker compose -f docker-compose.yml -f production.yml up --detach --remove-orphans 
 
 EOF
