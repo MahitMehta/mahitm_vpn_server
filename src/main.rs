@@ -2,12 +2,12 @@ mod utils;
 
 use actix_web::{get, post, web::{self}, Error, App, HttpResponse, HttpServer, Responder, HttpRequest, Result, dev::{ServiceRequest, ServiceResponse}, body::MessageBody, FromRequest, HttpMessage };
 use actix_web_lab::middleware::{Next, from_fn};
-use futures::future::{ok, err};
+use futures::{future::{ok, err}, stream::BoxStream, Stream};
 use std::{process::{Command, Stdio}, fs::File, collections::HashMap, sync::Mutex}; 
 use log::info; 
 use env_logger::Env;
 use dotenv; 
-use firestore::{ FirestoreDb, FirestoreDbOptions };
+use firestore::*;
 use serde::{Deserialize, Serialize};
 use std::io::{Write};
 use firebase_token::JwkAuth;
@@ -37,7 +37,7 @@ struct AppState {
 
 #[get("/")]
 async fn root() -> impl Responder {
-    HttpResponse::Ok().body("All Systems Operational!")
+    HttpResponse::Ok().body("All Systems Operational.")
 }
 
 async fn add_peer(_req : HttpRequest, db : web::Data<FirestoreDb>, app_state: web::Data<AppState>, user : User) -> Result<impl Responder> {
@@ -164,7 +164,6 @@ async fn auth_middleware(
             user_id
         });
     }
-
     next.call(req).await
 }
 
@@ -224,7 +223,7 @@ async fn main() -> std::io::Result<()> {
     let updated_tunnel: Result<TunnelStruct, firestore::errors::FirestoreError> = db.fluent()
         .update()
         .in_col("tunnels")
-        .document_id(wg_tunnel_id.unwrap().to_string())
+        .document_id(wg_tunnel_id.as_ref().unwrap().to_string())
         .object(&tunnel_struct)
         .execute()
         .await;
