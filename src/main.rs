@@ -171,6 +171,10 @@ async fn auth_middleware(
 async fn main() -> std::io::Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
    
+    let app_state = web::Data::new(AppState {
+        peers: Mutex::new(HashMap::new()), // TODO: Populate with clients from Firestore
+    });
+
     utils::generate_firebase_credentials_file();
    
     let firebase_project_id = dotenv::var("FIREBASE_PROJECT_ID");    
@@ -256,6 +260,31 @@ updated_tunnel.as_ref().unwrap().port,
     
     write!(output, "{}", wg_conf).expect("Updated wg0.conf");
 
+    let docs = db.fluent()
+        .list()
+        .from("peers")
+        .parent(db.parent_path("tunnels", wg_tunnel_id.unwrap()).unwrap())
+        .get_page()
+        .await;
+
+    for previously_connected_peer in docs.unwrap().documents.iter(){
+        // TODO: Figure out better way to extract string
+        let peer_ipv4_raw = format!("{:?}", previously_connected_peer.fields.get("ipv4").unwrap().value_type.as_ref().unwrap());
+        let public_key_raw = format!("{:?}", previously_connected_peer.fields.get("public_key").unwrap().value_type.as_ref().unwrap());
+        
+        let peer_ipv4_split = peer_ipv4_raw.as_str().split(&['\"', '\"']).collect::<Vec<&str>>();
+        let peer_ipv4 = peer_ipv4_split.get(1).unwrap().to_string();
+
+        let public_key_split = public_key_raw.as_str().split(&['\"', '\"']).collect::<Vec<&str>>();
+        let public_key = public_key_split.get(1).unwrap().to_string();
+        
+        utils::add_peer_to_conf(&peer_ipv4, &public_key);
+
+        app_state.peers.lock().unwrap().insert(peer_ipv4, PeerCache { 
+            user_id: previously_connected_peer.name.to_string()
+        });
+    }
+
     Command::new("wg-quick")
         .args(["down", "wg0"])
         .output()
@@ -271,27 +300,12 @@ updated_tunnel.as_ref().unwrap().port,
     info!("STDERR:");
     info!("{}", stderr);
 
-    let app_state = web::Data::new(AppState {
-        peers: Mutex::new(HashMap::new()), // TODO: Populate with clients from Firestore
-    });
-
     HttpServer::new(move || {
         App::new()
             .app_data(app_state.clone())
             .app_data(web::Data::new(db.clone()))
             .service(root)
             .service(remove_peer)
-            // .wrap_fn(|req, srv| {
-            //     let auth_header = std::str::from_utf8(req.headers().get("Authorization").unwrap().as_bytes()).unwrap().to_string(); 
-            //     let auth_token = auth_header.split("Bearer").collect::<Vec<&str>>()[1].trim_start();
-     
-
-            //     let fut = srv.call(req);
-            //     async {
-            //         let res = fut.await?;
-            //         Ok(res)
-            //     }
-            // })
             .wrap(from_fn(auth_middleware))
             .route("/peer/add", web::post().to(add_peer))
     })

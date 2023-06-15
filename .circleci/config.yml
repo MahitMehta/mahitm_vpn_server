@@ -74,6 +74,15 @@ jobs:
           name: Push to DigitalOcean Registry
           command: |  
             docker compose -f docker-compose.yml -f production.yml push 
+  run_vpn: 
+    docker: 
+      - image: cimg/base:2023.06
+    steps: 
+      - checkout
+      - run:
+            name: Connect to Droplet via SSH and Run or Refresh Services
+            command: |
+              ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST 'sh' < ./scripts/run.sh
 workflows:
   build_and_upload: 
     jobs: 
@@ -81,3 +90,8 @@ workflows:
           context: mahitmvpn
       - build: 
           context: mahitmvpn
+      - run_vpn: 
+          context: mahitmvpn
+          requires: 
+            - setup_droplet
+            - build

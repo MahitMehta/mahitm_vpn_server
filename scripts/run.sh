@@ -1,0 +1,13 @@
+#!/bin/bash
+
+sudo su - <<EOF
+
+pwd 
+
+cd mahitm_vpn_server
+
+docker compose -f docker-compose.yml -f production.yml pull --detach
+
+docker compose -f docker-compose.yml -f production.yml up --detach
+
+EOF
