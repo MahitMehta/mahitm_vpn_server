@@ -56,6 +56,7 @@ jobs:
           FIREBASE_CLIENT_ID=$FIREBASE_CLIENT_ID
           FIREBASE_CLIENT_SECRET=$FIREBASE_CLIENT_SECRET
           FIREBASE_REFRESH_TOKEN=$FIREBASE_REFRESH_TOKEN
+    resource_class: 2xlarge
     steps: 
       - doctl_install
       - doctl_initialize
