@@ -1,7 +1,7 @@
 mod utils;
 
 use actix_web::{get, post, web::{self}, Error, App, HttpResponse, HttpServer, Responder, HttpRequest, Result, dev::{ServiceRequest, ServiceResponse}, body::MessageBody, FromRequest, HttpMessage };
-use actix_web_lab::middleware::{Next, from_fn};
+use actix_web_lab::{middleware::{Next, from_fn}};
 use futures::{future::{ok, err}};
 use std::{process::{Command, Stdio}, fs::File, collections::HashMap, sync::Mutex}; 
 use log::info; 
@@ -11,6 +11,8 @@ use firestore::*;
 use serde::{Deserialize, Serialize};
 use std::io::{Write};
 use firebase_token::JwkAuth;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use nat_detect::{nat_detect, NatType};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct TunnelStruct {
@@ -33,6 +35,22 @@ struct PeerCache {
 
 struct AppState {
     peers: Mutex<HashMap<String, PeerCache>>,
+}
+
+#[get("/nat")]
+async fn nat() -> impl Responder {
+    let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 5000);
+    let stun_server_ip = "212.227.67.34:3478";
+
+    match Box::pin(nat_detect(address, &stun_server_ip)).await {
+        Ok(data) => {
+            HttpResponse::Ok().body(format!("NAT Retrieved: {}, {:?}, {}", data.1, data.2, address))
+        }
+        Err(no_data) => {
+            info!("{}", no_data);
+            HttpResponse::Ok().body("NAT Not Retrieved") 
+        }
+    }
 }
 
 #[get("/")]
@@ -249,7 +267,9 @@ PostDown =
 updated_tunnel.as_ref().unwrap().private_key, 
 "10.8.0.1",
 updated_tunnel.as_ref().unwrap().port, 
-"iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE; iptables -A INPUT -p udp -m udp --dport 51820 -j ACCEPT; iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT;"
+format!(
+    "iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE; iptables -A INPUT -p udp -m udp --dport {} -j ACCEPT; iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT;",
+    wg_port.unwrap().to_string())
     );
 
     let wg_conf_path = dotenv::var("WG_CONF_PATH");    
@@ -305,6 +325,7 @@ updated_tunnel.as_ref().unwrap().port,
             .app_data(app_state.clone())
             .app_data(web::Data::new(db.clone()))
             .service(root)
+            .service(nat)
             .service(remove_peer)
             .wrap(from_fn(auth_middleware))
             .route("/peer/add", web::post().to(add_peer))

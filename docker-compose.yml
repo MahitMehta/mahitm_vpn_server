@@ -18,7 +18,7 @@ services:
       - ./wireguard:/etc/wireguard
       - ./src/firebase:/src/firebase
     ports:
-      - "51820:51820/udp"
+      - "$WG_PORT:$WG_PORT/udp"
       - "8080:8080/tcp"
     restart: unless-stopped
     cap_add:
