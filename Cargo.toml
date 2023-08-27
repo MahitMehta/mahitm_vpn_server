@@ -1,7 +1,10 @@
 [package]
 name = "mahitm_vpn_server"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+description = "MahitM VPN Server"
+license = "MIT"
+authors = ["Mahit Mehta"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,4 +22,6 @@ actix-web-lab = "0.19.1"
 futures = "0.3.28"
 prost = "0.11"
 prost-types = "0.11"
-nat-detect = "0.1.7"
+
+[package.metadata.deb]
+depends = "wireguard-tools" 

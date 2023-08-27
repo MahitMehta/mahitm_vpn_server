@@ -1,8 +1,9 @@
 use std::fs::File;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use log::info;
-use serde::{Serialize};
+use serde::Serialize;
 use serde_json;
 
 #[derive(Serialize)]
@@ -16,7 +17,7 @@ struct FirebaseCredentials {
     account_type: String
 }
 
-pub(crate) fn generate_firebase_credentials_file() {
+pub(crate) fn generate_firebase_credentials_file() -> PathBuf{
     let firebase_project_id = dotenv::var("FIREBASE_PROJECT_ID");    
     assert!(firebase_project_id.is_ok(), "Environment Variable \"FIREBASE_PROJECT_ID\" Could not be found!");
 
@@ -35,13 +36,21 @@ pub(crate) fn generate_firebase_credentials_file() {
         quota_project_id: firebase_project_id.ok().unwrap(),
         refresh_token: firebase_refresh_token.ok().unwrap(),
         account_type: "authorized_user".to_string()
-    };
+    };  
 
     let json = serde_json::to_string(&firebase_credentials)
         .expect("Constructed JSON Representation of struct FirebaseCredentials");
 
-    let mut output = File::create("src/firebase/credentials.json").expect("Initiated creation of Firebase Credentials file");
+    let tmp_dir = std::env::temp_dir(); 
+    let firebase_credentials_dir =  Path::new(&tmp_dir.display().to_string()).join("mahitm_vpn_server");
+    
+    let _ = std::fs::create_dir(&firebase_credentials_dir);
+    let firebase_credentials_file = firebase_credentials_dir.join("credentials.json");
+
+    let mut output = File::create(&firebase_credentials_file).expect("Initiated creation of Firebase Credentials file");
     write!(output, "{}", json).expect("Injected Credentials into Firebase Credentials File");
+
+    firebase_credentials_file
 }
 
 pub(crate) fn generate_private_key() -> String {

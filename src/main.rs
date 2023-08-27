@@ -1,18 +1,16 @@
 mod utils;
 
 use actix_web::{get, post, web::{self}, Error, App, HttpResponse, HttpServer, Responder, HttpRequest, Result, dev::{ServiceRequest, ServiceResponse}, body::MessageBody, FromRequest, HttpMessage };
-use actix_web_lab::{middleware::{Next, from_fn}};
-use futures::{future::{ok, err}};
+use actix_web_lab::middleware::{Next, from_fn};
+use futures::future::{ok, err};
 use std::{process::{Command, Stdio}, fs::File, collections::HashMap, sync::Mutex}; 
 use log::info; 
 use env_logger::Env;
 use dotenv; 
 use firestore::*;
 use serde::{Deserialize, Serialize};
-use std::io::{Write};
+use std::io::Write;
 use firebase_token::JwkAuth;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use nat_detect::{nat_detect, NatType};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct TunnelStruct {
@@ -35,22 +33,6 @@ struct PeerCache {
 
 struct AppState {
     peers: Mutex<HashMap<String, PeerCache>>,
-}
-
-#[get("/nat")]
-async fn nat() -> impl Responder {
-    let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 5000);
-    let stun_server_ip = "212.227.67.34:3478";
-
-    match Box::pin(nat_detect(address, &stun_server_ip)).await {
-        Ok(data) => {
-            HttpResponse::Ok().body(format!("NAT Retrieved: {}, {:?}, {}", data.1, data.2, address))
-        }
-        Err(no_data) => {
-            info!("{}", no_data);
-            HttpResponse::Ok().body("NAT Not Retrieved") 
-        }
-    }
 }
 
 #[get("/")]
@@ -193,7 +175,7 @@ async fn main() -> std::io::Result<()> {
         peers: Mutex::new(HashMap::new()), // TODO: Populate with clients from Firestore
     });
 
-    utils::generate_firebase_credentials_file();
+    let firebase_credentials_path = utils::generate_firebase_credentials_file();
    
     let firebase_project_id = dotenv::var("FIREBASE_PROJECT_ID");    
     assert!(firebase_project_id.is_ok(), "Environment Variable \"FIREBASE_PROJECT_ID\" Could not be found!");
@@ -210,7 +192,7 @@ async fn main() -> std::io::Result<()> {
     let db = FirestoreDb::with_options_token_source(
         FirestoreDbOptions::new(firebase_project_id.as_ref().unwrap().to_string()),
         gcloud_sdk::GCP_DEFAULT_SCOPES.clone(),
-        gcloud_sdk::TokenSourceType::File("src/firebase/credentials.json".into())
+        gcloud_sdk::TokenSourceType::File(firebase_credentials_path)
     ).await.expect("Failed to Connect to Firestore");
 
     let wg_private_key : String;
@@ -325,7 +307,6 @@ format!(
             .app_data(app_state.clone())
             .app_data(web::Data::new(db.clone()))
             .service(root)
-            .service(nat)
             .service(remove_peer)
             .wrap(from_fn(auth_middleware))
             .route("/peer/add", web::post().to(add_peer))
