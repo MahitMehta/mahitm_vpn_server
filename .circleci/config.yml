@@ -85,7 +85,7 @@ jobs:
             command: |
               ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST 'sh' < ./scripts/run.sh
 
-  build_amd64: 
+  build_arm64: 
     docker: 
       - image: cimg/rust:1.71
     resource_class: arm.large
@@ -102,6 +102,10 @@ jobs:
           name: Build 
           command: | 
             cargo-deb
+      - persist_to_workspace:
+          root: ./target
+          paths:
+            - debian
       - save_cache:
           paths:
             - /home/circleci/.cargo/registry
@@ -109,7 +113,18 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: v1-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
-          
+  publish-github-release:
+    docker:
+      - image: cimg/go:1.21.0
+    steps:
+      - attach_workspace:
+          at: ./target
+      - run:
+          name: "Publish Release on GitHub"
+          command: |
+            go get github.com/tcnksm/ghr
+            VERSION=$(my-binary --version)
+            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${VERSION} ./target/debian
 workflows:
   build_and_upload: 
     jobs: 
@@ -122,12 +137,16 @@ workflows:
           requires: 
             - setup_droplet
             - build
-  build_release: 
+  build_and_release: 
     jobs: 
-      - build_amd64:
+      - build_arm64:
           filters:
             tags:
               only:
                 - /v.*/
             branches:
               ignore: /.*/
+      - publish-github-release:
+          context: gh_secrets
+          requires: 
+            - build_arm64 
