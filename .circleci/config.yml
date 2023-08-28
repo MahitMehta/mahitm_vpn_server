@@ -145,6 +145,12 @@ workflows:
             branches:
               ignore: /.*/
       - publish-github-release:
+          filters:
+            tags:
+              only:
+                - /v.*/
+            branches:
+              ignore: /.*/
           context: gh_secrets
           requires: 
             - build_arm64 
