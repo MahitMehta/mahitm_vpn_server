@@ -107,9 +107,9 @@ workflows:
             - setup_droplet
             - build
   build_release: 
-    filters:
-      tags:
-        only:
-          - /v.*/
     jobs: 
-      - build_amd64
+      - build_amd64:
+          filters:
+            tags:
+              only:
+                - /v.*/
