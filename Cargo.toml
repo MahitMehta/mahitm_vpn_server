@@ -29,5 +29,6 @@ assets = [
     ["target/release/mahitm_vpn_server", "usr/bin/mahitm_vpn_server", "755"],
     ["scripts/debian/*", "var/lib/mahitm_vpn_server/scripts/debian", "755"],
     ["conf/*", "var/lib/mahitm_vpn_server/conf", "644"],
+    ["README.md", "var/lib/mahitm_vpn_server/README.md", "644"],
 ]
 maintainer-scripts = "scripts/debian"
