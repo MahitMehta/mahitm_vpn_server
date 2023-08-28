@@ -1,6 +1,6 @@
 [package]
 name = "mahitm_vpn_server"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 description = "MahitM VPN Server"
 license = "MIT"
@@ -32,3 +32,6 @@ assets = [
     ["README.md", "var/lib/mahitm_vpn_server/README.md", "644"],
 ]
 maintainer-scripts = "scripts/debian"
+
+[package.metadata.deb.systemd-units]
+unit-scripts = "scripts/debian"

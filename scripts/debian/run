@@ -1,0 +1,11 @@
+#!/bin/bash
+
+conf_file="/var/lib/mahitm_vpn_server/conf/net.conf"
+
+sudo su - <<EOF
+sysctl -p $conf_file
+EOF
+
+export MAHITM_VPN_ENV_PATH=/var/lib/mahitm_vpn_server/.env
+
+/usr/bin/mahitm_vpn_server

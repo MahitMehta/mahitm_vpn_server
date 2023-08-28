@@ -1,0 +1,8 @@
+[Unit]
+Description=Running MahitM VPN Server
+
+[Service]
+ExecStart=/var/lib/mahitm_vpn_server/scripts/debian/run 
+
+[Install]
+WantedBy=multi-user.target

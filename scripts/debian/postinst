@@ -1,9 +1,0 @@
-#!/bin/bash 
-
-conf_file="/var/lib/mahitm_vpn_server/conf/net.conf"
-
-sudo su - <<EOF
-sysctl -p $conf_file
-EOF
-
-exit 0

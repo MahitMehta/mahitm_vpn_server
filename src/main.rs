@@ -169,6 +169,10 @@ async fn auth_middleware(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let env_file_path = dotenv::var("MAHITM_VPN_ENV_PATH").unwrap_or(".env".to_string());  
+    
+    let _ = dotenv::from_filename(env_file_path);
+
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
    
     let app_state = web::Data::new(AppState {
