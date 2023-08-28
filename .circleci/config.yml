@@ -108,7 +108,8 @@ jobs:
             - debian
       - save_cache:
           paths:
-            - /home/circleci/.cargo
+            - /home/circleci/.cargo/registry
+            - /home/circleci/.cargo/bin
             - target
           key: v1-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
   publish-github-release:
