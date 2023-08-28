@@ -108,20 +108,19 @@ jobs:
             - debian
       - save_cache:
           paths:
-            - /home/circleci/.cargo/registry
+            - /home/circleci/.cargo
             - target
           key: v1-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
   publish-github-release:
     docker:
-      - image: cimg/go:1.21.0
+      - image: cibuilds/github:0.10
     steps:
       - attach_workspace:
           at: ./target
       - run:
           name: "Publish Release on GitHub"
           command: |
-            go get github.com/tcnksm/ghr
-            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} ./target/debian
+            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} ./artifacts/
 workflows:
   build_and_upload: 
     jobs: 
