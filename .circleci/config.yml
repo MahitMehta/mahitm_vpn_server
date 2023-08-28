@@ -84,6 +84,16 @@ jobs:
             name: Connect to Droplet via SSH and Run or Refresh Services
             command: |
               ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST 'sh' < ./scripts/run.sh
+
+  build_amd64: 
+    docker: 
+      - image: cimg/rust:1.71
+    resource_class: arm.large
+    steps: 
+      - run: 
+          name: Install Debian Build Tool
+          command: |
+            cargo install cargo-deb 
 workflows:
   build_and_upload: 
     jobs: 
@@ -96,3 +106,10 @@ workflows:
           requires: 
             - setup_droplet
             - build
+  build_release: 
+    filters:
+      tags:
+        only:
+          - /v.*/
+    jobs: 
+      - build_amd64
