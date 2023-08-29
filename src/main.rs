@@ -192,6 +192,8 @@ async fn main() -> std::io::Result<()> {
 
     let wg_tunnel_id = dotenv::var("WG_TUNNEL_ID");    
     assert!(wg_tunnel_id.is_ok(), "Environment Variable \"WG_TUNNEL_ID\" Could not be found!");
+    
+    let wg_network_adapter = dotenv::var("WG_NETWORK_ADAPTER").unwrap_or("eth0".to_string());    
 
     let db = FirestoreDb::with_options_token_source(
         FirestoreDbOptions::new(firebase_project_id.as_ref().unwrap().to_string()),
@@ -254,7 +256,8 @@ updated_tunnel.as_ref().unwrap().private_key,
 "10.8.0.1",
 updated_tunnel.as_ref().unwrap().port, 
 format!(
-    "iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE; iptables -A INPUT -p udp -m udp --dport {} -j ACCEPT; iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT;",
+    "iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o {} -j MASQUERADE; iptables -A INPUT -p udp -m udp --dport {} -j ACCEPT; iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT;",
+    wg_network_adapter.to_string(),
     wg_port.unwrap().to_string())
     );
 
