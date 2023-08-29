@@ -93,7 +93,7 @@ jobs:
       - checkout 
       - restore_cache:
           keys:
-            - v1-cargo-mahitm-vpn-server-cache-{{ arch }} # {{ checksum "Cargo.lock" }}
+            - v2-cargo-mahitm-vpn-server-cache-{{ arch }} # {{ checksum "Cargo.lock" }}
       - run: 
           name: Install Debian Build Tool
           command: |
@@ -110,8 +110,10 @@ jobs:
           paths:
             - /home/circleci/.cargo/registry
             - /home/circleci/.cargo/bin
+            - /home/circleci/.cargo/.crates.toml
+            -  /home/circleci/.cargo/.crates2.json
             - target
-          key: v1-cargo-mahitm-vpn-server-cache-{{ arch }} # {{ checksum "Cargo.lock" }}
+          key: v2-cargo-mahitm-vpn-server-cache-{{ arch }} # {{ checksum "Cargo.lock" }}
   publish-github-release:
     docker:
       - image: cibuilds/github:0.10
