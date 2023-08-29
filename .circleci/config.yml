@@ -111,7 +111,7 @@ jobs:
             - /home/circleci/.cargo/registry
             - /home/circleci/.cargo/bin
             - target
-          key: v1-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
+          key: v1-cargo-mahitm-vpn-server-cache-{{ arch }} # {{ checksum "Cargo.lock" }}
   publish-github-release:
     docker:
       - image: cibuilds/github:0.10
