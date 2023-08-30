@@ -1,90 +1,35 @@
 version: 2.1
 
-commands: 
-  doctl_install:
-    description: Install the doctl, if not available
-    steps:
-      - run: 
-          command: |
-            cat /etc/os-release
-      - run: 
-          command: |
-            apk update
-            apk upgrade --available
-            apk --no-cache add doctl
-      - run: 
-          command: |
-            doctl version     
-  doctl_initialize:
-    description: Initilize the digitalocean CLI
-    parameters:
-      digitalocean-access-token:
-        default: DIGITALOCEAN_ACCESS_TOKEN
-        description: |
-          Name of environment variable storing the digitalocean v2 api access token
-        type: env_var_name
-    steps:
-      - run:
-          command: |
-            doctl auth init -t $<<parameters.digitalocean-access-token>>
-          name: Initialize doctl
-
-jobs:    
-  setup_droplet: 
+jobs:   
+  build_amd64: 
     docker: 
-      - image: cimg/base:2023.06
-    steps: 
-      - checkout
-      - run:
-            name: Connect to Droplet via SSH and Execute Setup Script
-            command: |
-              ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST 'sh' < ./scripts/setup.sh
-  build: 
-    parameters:
-      digitalocean-access-token:
-        default: DIGITALOCEAN_ACCESS_TOKEN
-        description: |
-          Name of environment variable storing the digitalocean v2 api access token
-        type: env_var_name
-    docker: 
-      - image: docker:24.0.2-git
-        environment: 
-          WG_HOST=$WG_HOST
-          WG_PORT=$WG_PORT
-          WG_TUNNEL_ID=$WG_TUNNEL_ID
-          FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID
-          FIREBASE_CLIENT_ID=$FIREBASE_CLIENT_ID
-          FIREBASE_CLIENT_SECRET=$FIREBASE_CLIENT_SECRET
-          FIREBASE_REFRESH_TOKEN=$FIREBASE_REFRESH_TOKEN
+    - image: cimg/rust:1.71
     resource_class: large
     steps: 
-      - doctl_install
-      - doctl_initialize
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
+      - checkout 
+      - restore_cache:
+          keys:
+            - v2-cargo-mahitm-vpn-server-cache-{{ arch }} # {{ checksum "Cargo.lock" }}
       - run: 
-          name: Docker Compose Build
+          name: Install Debian Build Tool
           command: |
-            docker compose -f docker-compose.yml -f production.yml build 
+            cargo install cargo-deb 
       - run: 
-          name: Login to DigitalOcean Registry
-          command: |
-            doctl registry login
-      - run: 
-          name: Push to DigitalOcean Registry
-          command: |  
-            docker compose -f docker-compose.yml -f production.yml push 
-  run_vpn: 
-    docker: 
-      - image: cimg/base:2023.06
-    steps: 
-      - checkout
-      - run:
-            name: Connect to Droplet via SSH and Run or Refresh Services
-            command: |
-              ssh -o StrictHostKeyChecking=no $SSH_USER@$WG_HOST 'sh' < ./scripts/run.sh
-
+          name: Build 
+          command: | 
+            cargo-deb
+      - persist_to_workspace:
+          root: ./target
+          paths:
+            - debian
+      - save_cache:
+          paths:
+            - /home/circleci/.cargo/registry
+            - /home/circleci/.cargo/bin
+            - /home/circleci/.cargo/.crates.toml
+            -  /home/circleci/.cargo/.crates2.json
+            - target
+          key: v2-cargo-mahitm-vpn-server-cache-{{ arch }} # {{ checksum "Cargo.lock" }}
   build_arm64: 
     docker: 
       - image: cimg/rust:1.71
@@ -125,20 +70,16 @@ jobs:
           command: |
             ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} ./target/debian/*.deb
 workflows:
-  build_and_upload: 
-    jobs: 
-      - setup_droplet: 
-          context: mahitmvpn
-      - build: 
-          context: mahitmvpn
-      - run_vpn: 
-          context: mahitmvpn
-          requires: 
-            - setup_droplet
-            - build
   build_and_release: 
     jobs: 
       - build_arm64:
+          filters:
+            tags:
+              only:
+                - /v.*/
+            branches:
+              ignore: /.*/
+      - build_amd64:
           filters:
             tags:
               only:
@@ -155,3 +96,4 @@ workflows:
           context: gh_secrets
           requires: 
             - build_arm64 
+            - build_amd64
