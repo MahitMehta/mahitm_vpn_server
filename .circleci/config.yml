@@ -50,7 +50,7 @@ jobs:
       - persist_to_workspace:
           root: ./target
           paths:
-            - debian
+            - debian/*.deb
       - save_cache:
           paths:
             - /home/circleci/.cargo/registry
